@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Premiere Web — Video Editor</title>
+  <meta name="description" content="A Premiere Pro-style non-linear video editor that runs entirely in your browser.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300005b'/%3E%3Crect x='2' y='2' width='28' height='28' rx='4' fill='none' stroke='%239999ff' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='bold' font-size='15' fill='%239999ff' text-anchor='middle'%3EPr%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="logo" title="Premiere Web">Pr</div>
+      <nav class="menubar"></nav>
+      <div class="ws-tabs">
+        <span class="ws-tab active">Editing</span><span class="ws-tab">Assembly</span><span class="ws-tab">Effects</span><span class="ws-tab">Audio</span>
+      </div>
+      <div class="topbar-right"><span id="save-state" class="save-state">Saved</span></div>
+    </header>
+
+    <main class="workspace">
+      <div class="ws-row top">
+      <!-- top-left: Source / Effect Controls / Mixer -->
+      <section class="panel" id="p-src">
+        <div class="panel-tabs">
+          <div class="tab active" data-tab="source">Source</div>
+          <div class="tab" data-tab="effects">Effect Controls</div>
+          <div class="tab" data-tab="mixer">Audio Track Mixer</div>
+        </div>
+        <div class="panel-body">
+          <div class="tab-page active monitor" data-page="source"></div>
+          <div class="tab-page ec" data-page="effects"></div>
+          <div class="tab-page mixer" data-page="mixer"></div>
+        </div>
+      </section>
+      <div class="splitter v" id="split-top"></div>
+      <!-- top-right: Program -->
+      <section class="panel" id="p-prog">
+        <div class="panel-tabs"><div class="tab active" id="prog-title">Program: Sequence 01</div></div>
+        <div class="panel-body monitor"></div>
+      </section>
+
+      </div>
+      <div class="splitter h" id="split-h"></div>
+      <div class="ws-row bottom">
+
+      <!-- bottom-left: Project / Effects / History -->
+      <section class="panel" id="p-proj">
+        <div class="panel-tabs">
+          <div class="tab active" data-tab="project">Project</div>
+          <div class="tab" data-tab="fxlib">Effects</div>
+          <div class="tab" data-tab="history">History</div>
+        </div>
+        <div class="panel-body">
+          <div class="tab-page active project" data-page="project"></div>
+          <div class="tab-page fxlib" data-page="fxlib"></div>
+          <div class="tab-page history" data-page="history"></div>
+        </div>
+      </section>
+      <div class="splitter v" id="split-bottom"></div>
+      <div class="tools-col" id="tools"></div>
+      <!-- bottom-right: Timeline -->
+      <section class="panel" id="p-tl">
+        <div class="panel-tabs"><div class="tab active">Timeline: <span id="tl-title">Sequence 01</span></div></div>
+        <div class="panel-body timeline"></div>
+      </section>
+      <div class="meters" id="meters"></div>
+      </div>
+    </main>
+  </div>
+  <noscript>This editor needs JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
