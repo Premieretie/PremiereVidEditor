@@ -40,12 +40,22 @@ A Premiere Pro–style, non-linear video editor that runs entirely in the browse
 - A real-time recording fallback for browsers without WebCodecs
 - WAV audio mixdown and PNG still frames
 
-## Editing with Claude (MCP)
+## Editing with Claude
 
-Claude can edit your project directly. It can import media, cut and arrange clips, add effects, titles, transitions and keyframes, check its work by looking at rendered frames, and export the result.
+### In the browser: the Claude panel
+
+Click **✳ Ask Claude** (top right) or press `Ctrl+J`, then describe the edit you want. For example: *"Put my clips in order with cross dissolves, add a title that says 'Summer 2026' and make the last clip slow motion."* Claude works directly in your timeline. It can look at rendered frames to check its work, and each reply has an **Undo** button.
+
+- **API key:** the first time, paste an Anthropic API key from [console.anthropic.com](https://console.anthropic.com/settings/keys). The page calls the Claude API directly, so there's no server. Usage is billed to your Anthropic API account, which is separate from a claude.ai subscription. The key is only sent to `api.anthropic.com`, and it's kept in this browser only if you tick **Remember on this device**.
+- **Model and effort:** choose Claude Opus 5.5 (default), Sonnet 5.5 or Haiku 5.5, and Fast, Balanced or Thorough effort, from the panel header.
+- **Media:** attach files with the paperclip or by dragging them onto the panel. They're imported into the project, and Claude is told about them.
+
+### From the Claude desktop app or Claude Code (MCP)
+
+With the MCP server, Claude can also edit your project from the Claude desktop app or Claude Code. It can import media, cut and arrange clips, add effects, titles, transitions and keyframes, check its work by looking at rendered frames, and export the result.
 
 1. Set up the small local MCP server in [`mcp-server/`](mcp-server/README.md) and add it to Claude Desktop or Claude Code.
-2. In the editor, click **Connect Claude** (top right).
+2. In the editor, click **Claude app (MCP)** (top right).
 3. Ask Claude something like: *"Import ~/Videos/clip.mp4, trim the first 3 seconds, add a title that says 'Summer 2026' and export it as MP4."*
 
 Every change Claude makes appears live and can be undone from the History panel or with `Ctrl+Z`.

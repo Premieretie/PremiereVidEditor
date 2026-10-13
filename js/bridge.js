@@ -126,7 +126,7 @@ function pickVideoTrackFree(s, start, dur) {
 const label = l => `Claude: ${l}`;
 
 // ---------------- methods ----------------
-const METHODS = {
+export const METHODS = {
   async get_state({ include_effects = true } = {}) {
     const s = seq();
     return {
@@ -486,7 +486,7 @@ function setStatus(st, detail = '') {
   if (!btn) return;
   btn.dataset.state = st;
   btn.title = st === 'connected' ? 'Claude is connected through MCP. Click for details.' : st === 'connecting' ? `Looking for the Claude MCP server on port ${store.port}… ${detail}` : 'Connect Claude (MCP)';
-  btn.querySelector('.cl-text').textContent = st === 'connected' ? 'Claude connected' : st === 'connecting' ? 'Waiting for Claude…' : 'Connect Claude';
+  btn.querySelector('.cl-text').textContent = st === 'connected' ? 'Claude app connected' : st === 'connecting' ? 'Waiting for Claude app…' : 'Claude app (MCP)';
   bus.emit('claude-status', st);
 }
 
@@ -542,14 +542,14 @@ function openPanel() {
       </ol>
       <p class="muted">The bridge only talks to <code>127.0.0.1</code>. Your media never leaves your computer except when Claude asks to view a frame.</p>` }),
   );
-  modal('Claude (MCP)', body, [
+  modal('Connect the Claude app (MCP)', body, [
     { label: status === 'off' ? 'Close' : 'Disconnect', action: c => { if (status !== 'off') disconnect(); c(); } },
     { label: status === 'connected' ? 'OK' : 'Connect', primary: true, action: c => { const p = parseInt(port.value, 10); if (p && p !== store.port) { store.port = p; ws?.close(); } if (status !== 'connected') { store.enabled = true; connect(); } c(); } },
   ], { onClose: () => off() });
 }
 
 export function initBridge() {
-  btn = h('button.claude-btn', { on: { click: openPanel } }, h('span.cl-dot'), h('span.cl-text', {}, 'Connect Claude'));
+  btn = h('button.claude-btn', { on: { click: openPanel } }, h('span.cl-dot'), h('span.cl-text', {}, 'Claude app (MCP)'));
   $('.topbar-right').prepend(btn);
   setStatus('off');
   if (store.enabled) connect();

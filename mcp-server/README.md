@@ -41,7 +41,7 @@ claude mcp add premiere-web -- node /full/path/to/PremiereVidEditor/mcp-server/i
 
 On Windows, write the path like `"C:\\Users\\you\\PremiereVidEditor\\mcp-server\\index.js"`.
 
-**3. Connect the editor.** Open the editor (for example `https://premieretie.github.io/PremiereVidEditor/`) and click **Connect Claude** in the top-right corner, then **Connect**. The button turns orange and reads **Claude connected**. If Chrome asks whether the site may access apps and services on this device, click **Allow**. The editor reconnects automatically the next time you open it.
+**3. Connect the editor.** Open the editor (for example `https://premieretie.github.io/PremiereVidEditor/`) and click **Claude app (MCP)** in the top-right corner, then **Connect**. The button turns orange and reads **Claude app connected**. If Chrome asks whether the site may access apps and services on this device, click **Allow**. The editor reconnects automatically the next time you open it.
 
 **4. Ask Claude**, for example:
 - "Import ~/Videos/interview.mp4 and ~/Music/bed.mp3, cut the interview into three 10-second segments with cross dissolves, and put the music under it at -18 dB."
@@ -83,7 +83,7 @@ Set these in the `env` field of the Claude Desktop config, or with `claude mcp a
 
 ## Troubleshooting
 
-- **"The Premiere Web editor is not connected"**: open the editor and click **Connect Claude**. Keep the tab open while Claude works. Long exports need the tab to stay visible.
+- **"The Premiere Web editor is not connected"**: open the editor and click **Claude app (MCP)**. Keep the tab open while Claude works. Long exports need the tab to stay visible.
 - **Button stays yellow ("Waiting for Claude…")**: Claude isn't running the server. Check that the MCP server appears in Claude Desktop's settings or in `claude mcp list`, and that the ports match.
 - **"Port 7811 is already in use"**: another copy of the server is running, for example from both Claude Desktop and Claude Code. Close one, or give one of them a different `PREMIERE_WEB_PORT`.
 - **Safari won't connect**: Safari blocks secure pages from connecting to `ws://` on localhost. Use Chrome or Edge, or run the editor locally (`python3 -m http.server` in the repository root, then open `http://localhost:8000`).

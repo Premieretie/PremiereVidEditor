@@ -8,6 +8,7 @@ import { initProgram, initSource, exportFrame, srcToggle, srcMarkIn, srcMarkOut,
 import { initProject, initEffects, initEffectControls, initMixer, initMeters, initHistory, initTools, doImport, TOOLS } from './panels.js';
 import { exportDialog } from './exporter.js';
 import { initBridge } from './bridge.js';
+import { initClaudeChat, focusClaude } from './claude-chat.js';
 import { buildMenubar, tabs, splitter, toast, modal, confirmBox, dialog } from './ui.js';
 import { $, $$, h, debounce, download, pickFiles, timecode } from './util.js';
 import * as A from './actions.js';
@@ -26,8 +27,10 @@ initTimeline($('#p-tl .panel-body'));
 initTools($('#tools'));
 initMeters($('#meters'));
 initBridge();
+initClaudeChat($('[data-page=claude]'));
+$('.topbar-right').prepend(h('button.ask-claude', { title: 'Edit with Claude (Ctrl+J)', on: { click: () => { showTop('claude'); focusClaude(); } } }, '✳ Ask Claude'));
 
-bus.on('show-tab', name => { if (['source', 'effects', 'mixer'].includes(name)) showTop(name); else showBottom(name); });
+bus.on('show-tab', name => { if (['source', 'effects', 'mixer', 'claude'].includes(name)) showTop(name); else showBottom(name); });
 bus.on('focus-effect-controls', () => showTop('effects'));
 bus.on('selection', () => { if (ui.sel.size && $('#p-src .tab.active')?.dataset.tab === 'source' && !sourceState.media) showTop('effects'); });
 bus.on('project', () => { $('#prog-title').textContent = `Program: ${seq().name}`; $('#tl-title').textContent = seq().name; });
@@ -258,6 +261,7 @@ buildMenubar($('.menubar'), [
       { label: 'Source Monitor', action: () => showTop('source') },
       { label: 'Effect Controls', key: 'Shift+5', action: () => showTop('effects') },
       { label: 'Audio Track Mixer', key: 'Shift+6', action: () => showTop('mixer') },
+      { label: 'Claude', key: 'Ctrl+J', action: () => { showTop('claude'); focusClaude(); } },
       { label: 'Project', key: 'Shift+1', action: () => showBottom('project') },
       { label: 'Effects', key: 'Shift+7', action: () => showBottom('fxlib') },
       { label: 'History', action: () => showBottom('history') },
@@ -297,6 +301,7 @@ document.addEventListener('keydown', e => {
     if (kk === 'd') return run(() => A.applyTransition(sh ? 'constantPower' : 'crossDissolve'));
     if (kk === 'r') return run(A.speedDialog);
     if (kk === 'l') return run(A.toggleLink);
+    if (kk === 'j') return run(() => { showTop('claude'); focusClaude(); });
     if (kk === 'm' && sh) return run(() => A.gotoMarker(-1));
     if (kk === 'm') return run(exportDialog);
     if (kk === 'e' && sh) return run(exportFrame);

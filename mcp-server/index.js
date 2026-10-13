@@ -60,7 +60,7 @@ setInterval(() => { for (const c of wss.clients) { if (!c.isAlive) { c.terminate
 function call(method, params = {}, timeoutMs = 60000) {
   if (bridgeError) return Promise.reject(new Error(bridgeError));
   if (!editor || editor.readyState !== 1) {
-    return Promise.reject(new Error(`The Premiere Web editor is not connected. Ask the user to open the editor in their browser and click "Connect Claude" in the top-right corner (bridge port ${PORT}).`));
+    return Promise.reject(new Error(`The Premiere Web editor is not connected. Ask the user to open the editor in their browser and click "Claude app (MCP)" in the top-right corner (bridge port ${PORT}).`));
   }
   const id = nextId++;
   return new Promise((resolve, reject) => {
