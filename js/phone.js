@@ -202,13 +202,35 @@ export function setMode(mode, { save = true } = {}) {
 
 export function currentMode() { return isPhone() ? 'phone' : 'desktop'; }
 
+let pill = null;
+function updatePill() {
+  if (!pill) return;
+  pill.classList.toggle('show', !isPhone() && isPhoneDevice());
+  // The desktop layout is zoomed out on a phone, so scale the button up to stay finger-sized
+  const k = Math.max(1, 1 / (window.visualViewport?.scale || 1));
+  pill.style.fontSize = Math.round(15 * k) + 'px';
+}
+
+/** Phone-sized touch device (user agent or a small coarse-pointer screen). */
+export function isPhoneDevice() {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPod|Android.+Mobile|Windows Phone|Mobile.+Firefox|BlackBerry|Opera Mini/i.test(ua)) return true;
+  return matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
+}
+
 export function initPhone(menuDefs) {
   menus = menuDefs;
   let mode = null;
   try { mode = localStorage.getItem(MODE_KEY); } catch { }
-  if (!mode) mode = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600 ? 'phone' : 'desktop';
+  if (!mode) mode = isPhoneDevice() ? 'phone' : 'desktop';
+  // A floating shortcut back to the phone layout whenever a phone is showing the desktop layout
+  pill = h('button.phone-pill', { on: { click: () => setMode('phone') } }, '📱 Switch to phone layout');
+  document.body.append(pill);
+  bus.on('layout-mode', updatePill);
+  addEventListener('resize', updatePill);
+  window.visualViewport?.addEventListener('resize', updatePill);
   if (mode === 'phone') setMode('phone', { save: false });
-  else setViewport('desktop');
+  else { setViewport('desktop'); updatePill(); }
 }
 
 export function toggleMode() { setMode(isPhone() ? 'desktop' : 'phone'); }

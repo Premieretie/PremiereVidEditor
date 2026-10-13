@@ -494,3 +494,15 @@ body.phone #toasts { bottom: calc(70px + env(safe-area-inset-bottom)); }
   body.phone .ph-act { height: 44px; min-width: 52px; }
   body.phone .ph-editbar { border-right: 1px solid #111; }
 }
+
+/* layout toggle always reachable */
+.topbar { overflow: hidden; }
+.topbar .layout-btn { flex: none; margin: 0 2px 0 4px; }
+.menubar { min-width: 0; overflow: hidden; }
+.topbar-right { flex: none; }
+.ask-claude, .claude-btn { white-space: nowrap; flex: none; }
+@media (max-width: 1400px) { .save-state, .ws-tabs { display: none; } }
+@media (max-width: 1300px) { .claude-btn .cl-text { display: none; } .claude-btn { padding: 0 7px; } }
+.phone-pill { display: none; position: fixed; right: 1.2em; bottom: 1.2em; z-index: 950; padding: .7em 1.3em; border-radius: 2em; border: 0; background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.55); }
+.phone-pill.show { display: block; }
+body.phone .phone-pill { display: none; }

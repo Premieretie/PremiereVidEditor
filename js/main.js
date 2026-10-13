@@ -32,7 +32,7 @@ initTools($('#tools'));
 initMeters($('#meters'));
 initBridge();
 initClaudeChat($('[data-page=claude]'));
-$('.topbar-right').prepend(h('button.layout-btn', { title: 'Switch to the phone layout', on: { click: toggleMode } }, '📱 Phone'));
+$('.logo').after(h('button.layout-btn', { title: 'Switch to the phone layout', on: { click: toggleMode } }, '📱 Phone'));
 $('.topbar-right').prepend(h('button.ask-claude', { title: 'Edit with Claude (Ctrl+J)', on: { click: () => { showTop('claude'); focusClaude(); } } }, '✳ Ask Claude'));
 
 bus.on('show-tab', name => { if (['source', 'effects', 'mixer', 'claude'].includes(name)) showTop(name); else showBottom(name); });
