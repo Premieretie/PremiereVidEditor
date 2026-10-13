@@ -50,31 +50,66 @@ function computePeaks(ab, rate = 100) {
   return { data, rate };
 }
 
-async function probe(type, url) {
+// Phones have far less memory: decode audio for waveforms only from smaller files there.
+const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const MAX_DECODE_BYTES = () => (isMobile() ? 120 : 600) * 1024 * 1024;
+
+/** Create a muted, inline media element and make sure the browser actually starts loading it.
+ *  iOS Safari ignores `preload` for elements that are not playing, so nudge it with load()/play(). */
+function mediaEl(kind, url) {
+  const el = document.createElement(kind);
+  el.muted = true; el.playsInline = true; el.setAttribute('playsinline', ''); el.setAttribute('webkit-playsinline', '');
+  el.preload = 'auto'; el.crossOrigin = 'anonymous';
+  el.src = url;
+  try { el.load(); } catch { }
+  return el;
+}
+function waitForMedia(el, event, ms, name) {
+  return new Promise((res, rej) => {
+    if ((event === 'loadedmetadata' && el.readyState >= 1) || (event === 'loadeddata' && el.readyState >= 2)) return res();
+    let nudge, timer;
+    const done = fn => { clearTimeout(nudge); clearTimeout(timer); el.removeEventListener(event, ok); el.removeEventListener('error', bad); fn(); };
+    const ok = () => done(() => { if (!el.paused) el.pause(); res(); });
+    const bad = () => done(() => rej(new Error(unsupportedMsg(name, el.error))));
+    el.addEventListener(event, ok); el.addEventListener('error', bad);
+    // Still nothing after a moment: start muted playback (allowed on iOS), which forces loading.
+    nudge = setTimeout(() => { const p = el.play?.(); p?.catch?.(() => { }); }, 1500);
+    timer = setTimeout(() => done(() => rej(new Error(`the browser did not load it within ${ms / 1000}s. ${formatHint(name)}`))), ms);
+  });
+}
+const formatHint = name => /\.(mov|hevc)$/i.test(name || '')
+  ? 'If this is an iPhone video, it is probably HEVC (High Efficiency), which this browser can\'t decode. Fix: on the iPhone set Settings → Camera → Formats → Most Compatible for new videos, or open the editor in Safari / Chrome on a Mac or Windows PC.'
+  : 'The file may use a codec this browser cannot play.';
+function unsupportedMsg(name, err) {
+  return `this browser can't decode it${err?.code ? ` (media error ${err.code})` : ''}. ${formatHint(name)}`;
+}
+
+async function probe(type, url, name) {
   if (type === 'image') {
     const img = new Image(); img.src = url;
-    await img.decode();
+    try { await img.decode(); } catch { throw new Error(`this browser can't open this image format${/\.hei[cf]$/i.test(name) ? ' (HEIC: export it as JPEG, or set iPhone Settings → Camera → Formats → Most Compatible)' : ''}.`); }
     return { width: img.naturalWidth, height: img.naturalHeight, duration: 5, img };
   }
-  const el = document.createElement(type === 'audio' ? 'audio' : 'video');
-  el.preload = 'metadata'; el.muted = true; el.src = url;
-  await new Promise((res, rej) => { el.onloadedmetadata = res; el.onerror = () => rej(new Error('Unsupported media format')); });
+  const el = mediaEl(type === 'audio' ? 'audio' : 'video', url);
+  try { await waitForMedia(el, 'loadedmetadata', 20000, name); }
+  catch (e) { el.removeAttribute('src'); el.load(); throw e; }
   let duration = el.duration;
   if (!isFinite(duration)) { // MediaRecorder webm files report Infinity until seeked to end
     el.currentTime = 1e9; await waitEvent(el, 'seeked', 4000);
     duration = el.duration; el.currentTime = 0;
   }
-  const r = { duration: isFinite(duration) ? duration : 10, width: el.videoWidth || 0, height: el.videoHeight || 0 };
+  // Safari exposes audioTracks, which tells us whether a video has sound without decoding it
+  const audioTracks = el.audioTracks ? el.audioTracks.length : null;
+  const r = { duration: isFinite(duration) ? duration : 10, width: el.videoWidth || 0, height: el.videoHeight || 0, audioTracks };
   el.removeAttribute('src'); el.load();
   return r;
 }
 
 export async function makeThumbs(m, url) {
   const R = getRT(m.id);
-  const v = document.createElement('video');
-  v.muted = true; v.preload = 'auto'; v.src = url; v.playsInline = true;
-  await waitEvent(v, 'loadeddata', 8000);
-  const count = clamp(Math.ceil(m.duration / 2), 1, 48);
+  const v = mediaEl('video', url);
+  try { await waitForMedia(v, 'loadeddata', 15000, m.name); } catch { v.removeAttribute('src'); v.load(); return; }
+  const count = clamp(Math.ceil(m.duration / 2), 1, isMobile() ? 16 : 48);
   const th = 72, tw = Math.round(th * (m.width / m.height || 16 / 9));
   R.thumbs = [];
   for (let i = 0; i < count; i++) {
@@ -90,9 +125,10 @@ export async function makeThumbs(m, url) {
   bus.emit('media-updated', m.id);
 }
 
-async function analyzeAudio(m, blob) {
+async function analyzeAudio(m, blob, knownTracks = null) {
   const R = getRT(m.id);
-  if (blob.size > 600 * 1024 * 1024) { R.peaksPending = false; return true; }
+  // Large files: skip the full decode (it needs the whole file in memory) and keep the clip's sound.
+  if (blob.size > MAX_DECODE_BYTES()) { R.peaksPending = false; return knownTracks == null ? true : knownTracks > 0; }
   try {
     R.peaksPending = true;
     const ab = await decodeAudio(blob);
@@ -103,42 +139,53 @@ async function analyzeAudio(m, blob) {
     return ab.duration > 0.05;
   } catch {
     R.peaksPending = false;
-    return false;
+    return knownTracks != null ? knownTracks > 0 : false;
   }
 }
 
-/** Import File objects into the project. */
+/** Import File objects into the project. Reports failures through onProgress(message, isError). */
 export async function importFiles(files, onProgress) {
   const added = [];
-  let i = 0;
+  const failed = [];
+  let i = 0, storageWarned = false;
   for (const file of files) {
     i++;
     const type = detectType(file);
-    if (!type) { onProgress?.(`Skipped unsupported file: ${file.name}`); continue; }
+    if (!type) { failed.push(`${file.name}: not a video, audio or image file`); continue; }
     onProgress?.(`Importing ${file.name} (${i}/${files.length})…`);
-    const id = uid('m');
     const url = URL.createObjectURL(file);
-    let meta;
-    try { meta = await probe(type, url); }
-    catch (e) { onProgress?.(`Could not read ${file.name}: ${e.message}`); URL.revokeObjectURL(url); continue; }
-    const fileKey = uid('f');
-    try { await db.putFile(fileKey, file); } catch (e) { console.warn('Could not store file in IndexedDB', e); }
-    const m = {
-      id, name: file.name, type, mime: file.type, size: file.size, fileKey,
-      duration: meta.duration, width: meta.width, height: meta.height, hasAudio: type === 'audio',
-      created: Date.now(),
-    };
-    if (type === 'video' && !meta.width) m.type = 'audio';
-    const R = getRT(id); R.url = url; R.blob = file; R.img = meta.img;
-    if (m.type === 'video' || m.type === 'audio') {
-      const has = await analyzeAudio(m, file);
-      if (m.type === 'video') m.hasAudio = has;
+    try {
+      const meta = await probe(type, url, file.name);
+      const id = uid('m');
+      const fileKey = uid('f');
+      // Save to browser storage in the background so a slow write never blocks the import.
+      db.putFile(fileKey, file).catch(e => {
+        console.warn('Could not store file in IndexedDB', e);
+        if (!storageWarned) { storageWarned = true; onProgress?.(`${file.name} is in the project, but the browser couldn't keep a copy (storage full?). You'll need to re-import it after reloading the page.`, true); }
+      });
+      const m = {
+        id, name: file.name, type, mime: file.type, size: file.size, fileKey,
+        duration: meta.duration, width: meta.width, height: meta.height, hasAudio: type === 'audio',
+        created: Date.now(),
+      };
+      if (type === 'video' && !meta.width) m.type = 'audio';
+      const R = getRT(id); R.url = url; R.blob = file; R.img = meta.img;
+      if (m.type === 'video' || m.type === 'audio') {
+        if (file.size > MAX_DECODE_BYTES()) onProgress?.(`Importing ${file.name}: large file, skipping the audio waveform`);
+        const has = await analyzeAudio(m, file, meta.audioTracks);
+        if (m.type === 'video') m.hasAudio = has;
+      }
+      added.push(m);
+      commit(`Import ${file.name}`, () => project.media.push(m));
+      if (m.type === 'video') makeThumbs(m, url).catch(console.warn);
+      else if (m.type === 'image') { const c = document.createElement('canvas'); c.height = 72; c.width = Math.max(1, Math.round(72 * m.width / m.height)); c.getContext('2d').drawImage(meta.img, 0, 0, c.width, c.height); R.thumbs = [{ t: 0, c }]; bus.emit('media-updated', id); }
+    } catch (e) {
+      URL.revokeObjectURL(url);
+      failed.push(`${file.name}: ${e?.message || e}`);
     }
-    added.push(m);
-    commit(`Import ${file.name}`, () => project.media.push(m));
-    if (m.type === 'video') makeThumbs(m, url).catch(console.warn);
-    else if (m.type === 'image') { const c = document.createElement('canvas'); c.height = 72; c.width = Math.round(72 * m.width / m.height); c.getContext('2d').drawImage(meta.img, 0, 0, c.width, c.height); R.thumbs = [{ t: 0, c }]; bus.emit('media-updated', id); }
   }
+  if (failed.length) onProgress?.(`Couldn't import ${failed.length === 1 ? failed[0] : failed.length + ' files:\n' + failed.join('\n')}`, true);
+  else if (added.length) onProgress?.(`Imported ${added.length} item${added.length > 1 ? 's' : ''}`);
   return added;
 }
 
@@ -236,7 +283,9 @@ export function elementFor(clip) {
   const el = document.createElement(audioOnly ? 'audio' : 'video');
   el.preload = 'auto'; el.playsInline = true; el.crossOrigin = 'anonymous';
   el.muted = !audioOnly;
+  el.setAttribute('playsinline', '');
   el.src = R.url;
+  try { el.load(); } catch { } // iOS only starts loading after an explicit load()
   el.addEventListener('seeked', () => bus.emit('frame-ready'));
   el.addEventListener('loadeddata', () => bus.emit('frame-ready'));
   pool.set(clip.id, { el, mediaId: m.id, url: R.url, kind: clip.type });

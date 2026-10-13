@@ -7,7 +7,7 @@ import { project, seq, ui, bus, history, revertTo } from './store.js';
 import { importFiles } from './media.js';
 import { runExport } from './exporter.js';
 import { h, $, pickFiles, download } from './util.js';
-import { toast, confirmBox } from './ui.js';
+import { toast, confirmBox, notify } from './ui.js';
 
 const MODELS = [['claude-opus-5-5', 'Claude Opus 5.5'], ['claude-sonnet-5-5', 'Claude Sonnet 5.5'], ['claude-haiku-5-5', 'Claude Haiku 5.5']];
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-sonnet-5-5']); // server-side refusal fallbacks
@@ -169,7 +169,7 @@ async function attachFiles() {
   if (files.length) await addFiles(files);
 }
 async function addFiles(files) {
-  const added = await importFiles(files, m => toast(m));
+  const added = await importFiles(files, notify);
   for (const m of added) {
     st.pendingFiles.push(m);
     el.attach.append(h('span.ai-chip', { title: 'Imported into the project' }, '+ ' + m.name));

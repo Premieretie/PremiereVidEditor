@@ -151,7 +151,7 @@ export const METHODS = {
 
   async import_media({ name, data_base64, mime }) {
     const file = new File([base64ToBytes(data_base64)], name, { type: mime || '' });
-    const added = await importFiles([file], msg => toast(msg));
+    const added = await importFiles([file], (msg, err) => err ? null : toast(msg));
     if (!added.length) throw new Error(`Could not import ${name} (unsupported format for this browser?)`);
     return { imported: added.map(mediaSummary) };
   },

@@ -210,3 +210,12 @@ export function splitter(el, { axis, get, set, min = 120, onMove }) {
     el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up);
   });
 }
+
+/** Progress and result messages from long operations: errors open a dialog so they can't be missed. */
+export function notify(msg, isError = false) {
+  if (!isError) return toast(msg, 4000);
+  const body = document.createElement('div');
+  body.className = 'notify-body';
+  body.textContent = msg;
+  modal('Import problem', body, [{ label: 'OK', primary: true, action: c => c() }]);
+}

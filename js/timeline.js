@@ -8,7 +8,7 @@ import { getRT, importFiles } from './media.js';
 import { h, $, clamp, timecode, parseTimecode, uid, EPS, gainToDb, dbToGain } from './util.js';
 import { TRANSITIONS, EFFECTS, findFx, evalParam } from './effects.js';
 import * as A from './actions.js';
-import { contextMenu, toast, prompt } from './ui.js';
+import { contextMenu, toast, prompt, notify } from './ui.js';
 
 const RULER_H = 30;
 const SEP_H = 8;
@@ -1089,7 +1089,7 @@ function setupDrop() {
     const hit = hitTest(e.offsetX, e.offsetY);
     const t = snapTime(xToT(e.offsetX)); snapLine = null;
     if (e.dataTransfer.files?.length && !p) {
-      const added = await importFiles([...e.dataTransfer.files], msg => toast(msg));
+      const added = await importFiles([...e.dataTransfer.files], notify);
       let tt = t;
       for (const m of added) { const created = dropMedia(m, hit.row, tt, {}, e.ctrlKey || e.metaKey); tt = Math.max(tt, ...created.map(clipEnd)); }
       return;

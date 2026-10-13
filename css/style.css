@@ -506,3 +506,5 @@ body.phone #toasts { bottom: calc(70px + env(safe-area-inset-bottom)); }
 .phone-pill { display: none; position: fixed; right: 1.2em; bottom: 1.2em; z-index: 950; padding: .7em 1.3em; border-radius: 2em; border: 0; background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.55); }
 .phone-pill.show { display: block; }
 body.phone .phone-pill { display: none; }
+
+.notify-body { white-space: pre-wrap; max-width: 520px; color: #ddd; line-height: 1.5; }

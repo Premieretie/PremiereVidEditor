@@ -5,7 +5,7 @@ import { EFFECTS, TRANSITIONS, evalParam, setParam, toggleAnimation, makeEffect 
 import { audio, seek, engine, trackAudible } from './engine.js';
 import { h, $, clamp, timecode, fmtDur, pickFiles, gainToDb, dbToGain, parseTimecode, EPS, isPhone } from './util.js';
 import { setDragPayload } from './timeline.js';
-import { contextMenu, toast, prompt, confirmBox, dialog } from './ui.js';
+import { contextMenu, toast, prompt, confirmBox, dialog, notify } from './ui.js';
 import * as A from './actions.js';
 import { createTitleAt } from './monitors.js';
 
@@ -36,7 +36,7 @@ export function initProject(el) {
   // drop files from OS
   el.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); el.classList.add('drop'); } });
   el.addEventListener('dragleave', () => el.classList.remove('drop'));
-  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drop'); if (e.dataTransfer.files.length) importFiles([...e.dataTransfer.files], m => toast(m)); });
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drop'); if (e.dataTransfer.files.length) importFiles([...e.dataTransfer.files], notify); });
   pp.list.addEventListener('pointerdown', e => { if (e.target === pp.list) { ui.selMedia.clear(); render(); } });
   pp.list.addEventListener('dblclick', e => { if (e.target === pp.list) doImport(); });
   pp.list.addEventListener('contextmenu', e => { if (e.target === pp.list) { e.preventDefault(); contextMenu(e.clientX, e.clientY, newItems()); } });
@@ -49,7 +49,7 @@ export function initProject(el) {
 export async function doImport() {
   const files = await pickFiles('video/*,audio/*,image/*,.mkv,.mov,.mp4,.webm,.mp3,.wav,.m4a,.flac,.ogg');
   if (!files.length) return;
-  await importFiles(files, m => toast(m));
+  await importFiles(files, notify);
 }
 
 function newItems() {
