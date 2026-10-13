@@ -3,7 +3,7 @@ import { project, seq, ui, bus, commit, history, revertTo, mediaById, clipById, 
 import { importFiles, getRT, mediaIcon, newGenerated, relinkMedia, rt } from './media.js';
 import { EFFECTS, TRANSITIONS, evalParam, setParam, toggleAnimation, makeEffect } from './effects.js';
 import { audio, seek, engine, trackAudible } from './engine.js';
-import { h, $, clamp, timecode, fmtDur, pickFiles, gainToDb, dbToGain, parseTimecode, EPS } from './util.js';
+import { h, $, clamp, timecode, fmtDur, pickFiles, gainToDb, dbToGain, parseTimecode, EPS, isPhone } from './util.js';
 import { setDragPayload } from './timeline.js';
 import { contextMenu, toast, prompt, confirmBox, dialog } from './ui.js';
 import * as A from './actions.js';
@@ -108,6 +108,17 @@ function render() {
       setDragPayload({ kind: 'media', mediaId: m.id, srcIn: m.srcIn ?? 0, srcOut: m.srcOut ?? null });
     });
     it.addEventListener('dblclick', () => m.offline ? relink(m) : bus.emit('open-source', m.id));
+    // Phone: tap the + to insert the item at the playhead (drag and drop isn't available on touch screens)
+    const add = h('button.pp-add', { title: 'Add to timeline at playhead' }, '+');
+    add.addEventListener('pointerdown', e => e.stopPropagation());
+    add.addEventListener('click', e => {
+      e.stopPropagation();
+      if (m.offline) return relink(m);
+      const s = seq();
+      const created = commit('Insert', () => placeMedia(m, s.playhead, { mode: 'insert', srcIn: m.srcIn ?? 0, srcOut: m.srcOut ?? null }));
+      if (created?.length) { seek(Math.max(...created.map(clipEnd))); toast(`Added ${m.name}`); bus.emit('phone-pane', 'timeline'); }
+    });
+    it.querySelector('.pp-thumb').append(add);
     it.addEventListener('contextmenu', e => {
       e.preventDefault();
       if (!ui.selMedia.has(m.id)) { ui.selMedia = new Set([m.id]); render(); }
@@ -220,6 +231,7 @@ export function initEffects(el) {
             (kind === 'transition' && (k === 'crossDissolve' || k === 'constantPower')) ? h('span.fx-def', { title: 'Default transition' }, '★') : null);
           it.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', d.name); setDragPayload({ kind, type: k }); });
           it.addEventListener('dblclick', () => kind === 'transition' ? A.applyTransition(k) : A.applyEffect(k));
+          it.addEventListener('click', () => { if (isPhone()) kind === 'transition' ? A.applyTransition(k) : A.applyEffect(k); });
           tree.append(it);
         }
       }

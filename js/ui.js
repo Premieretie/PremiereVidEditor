@@ -1,5 +1,5 @@
 // Generic UI widgets: menus, context menus, dialogs, toasts, panel splitters and tabs.
-import { h, $, $$ } from './util.js';
+import { h, $, $$, isPhone } from './util.js';
 
 // ---------------- Toast ----------------
 export function toast(msg, ms = 2600) {
@@ -53,7 +53,40 @@ function fitToScreen(menu, altX) {
   });
 }
 
+/** Phone: menus open as a bottom sheet; submenus slide in with a Back row. */
+export function sheetMenu(items, title = '') {
+  closeMenus();
+  const back = h('div.sheet-back');
+  const sheet = h('div.sheet', { role: 'menu' });
+  const stack = [];
+  const render = (list, ttl) => {
+    sheet.innerHTML = '';
+    sheet.append(h('div.sheet-head', {},
+      stack.length ? h('button.sheet-back-btn', { on: { click: () => { const prev = stack.pop(); render(prev.list, prev.title); } } }, '‹ Back') : h('span'),
+      h('span.sheet-title', {}, ttl), h('button.sheet-x', { on: { click: closeMenus } }, '×')));
+    for (const it of (typeof list === 'function' ? list() : list)) {
+      if (!it) continue;
+      if (it === '-') { sheet.append(h('div.menu-sep')); continue; }
+      const row = h('div.sheet-row' + (it.disabled ? '.disabled' : ''), {},
+        h('span.menu-check', {}, it.checked ? '✓' : ''), h('span.menu-label', {}, it.label), h('span.menu-key', {}, it.sub ? '›' : ''));
+      row.addEventListener('click', () => {
+        if (it.disabled) return;
+        if (it.sub) { stack.push({ list, title: ttl }); render(it.sub, it.label); return; }
+        closeMenus(); it.action?.();
+      });
+      sheet.append(row);
+    }
+    sheet.scrollTop = 0;
+  };
+  render(items, title);
+  back.append(sheet);
+  back.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.target === back) closeMenus(); });
+  openMenu = back;
+  document.body.append(back);
+}
+
 export function contextMenu(x, y, items) {
+  if (isPhone()) return sheetMenu(items);
   closeMenus();
   openMenu = buildMenu(items, x, y);
   document.body.append(openMenu);

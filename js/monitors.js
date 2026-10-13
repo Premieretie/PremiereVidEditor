@@ -179,6 +179,37 @@ function setupOverlay() {
     const hit = vis.find(c => inside(clipCorners(c, s.playhead, s), x, y));
     if (hit) A.selectClip(hit);
   });
+  // Two-finger pinch on the monitor scales the selected clip.
+  const fingers = new Map(); let pinch = null, pinchGen = 0;
+  const fdist = () => { const [a, b] = [...fingers.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
+  o.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return;
+    fingers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (fingers.size !== 2) return;
+    e.stopImmediatePropagation();
+    const c = overlayClip(); const fx = c && findFx(c, 'motion'); if (!fx) return;
+    const s = seq(); const lt = s.playhead - c.start;
+    pinchGen++;
+    pinch = { fx, lt, d0: Math.max(10, fdist()), v0: evalEffect(fx, lt).scale, before: JSON.stringify(fx) };
+  }, true);
+  o.addEventListener('pointermove', e => {
+    if (!fingers.has(e.pointerId)) return;
+    fingers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (!pinch || fingers.size !== 2) return;
+    Object.assign(pinch.fx, JSON.parse(pinch.before));
+    setParam(pinch.fx, 'scale', Math.round(clamp(pinch.v0 * fdist() / pinch.d0, 1, 1000) * 10) / 10, pinch.lt);
+    engine.dirty = true; bus.emit('fx-live');
+  });
+  const fingerUp = e => {
+    fingers.delete(e.pointerId);
+    if (pinch && fingers.size < 2) {
+      const { fx, before } = pinch; pinch = null;
+      const after = JSON.stringify(fx); Object.assign(fx, JSON.parse(before));
+      if (after !== before) commit('Scale', () => Object.assign(fx, JSON.parse(after)));
+    }
+  };
+  o.addEventListener('pointerup', fingerUp); o.addEventListener('pointercancel', fingerUp);
+
   o.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     const s = seq(); const [x, y] = toSeq(e);
@@ -200,9 +231,11 @@ function setupOverlay() {
     const v0 = evalEffect(fx, lt);
     const x0 = v0.x ?? s.width / 2, y0 = v0.y ?? s.height / 2;
     const before = JSON.stringify(fx);
+    const gen = pinchGen;
     const d0 = Math.hypot(x - T.x, y - T.y), a0 = Math.atan2(y - T.y, x - T.x);
     o.setPointerCapture(e.pointerId);
     const mv = ev => {
+      if (ev.pointerId !== e.pointerId || pinch) return;
       const [nx, ny] = toSeq(ev);
       Object.assign(fx, JSON.parse(before));
       if (corner >= 0) {
@@ -222,13 +255,15 @@ function setupOverlay() {
       }
       engine.dirty = true; bus.emit('fx-live');
     };
-    const up = () => {
-      o.removeEventListener('pointermove', mv); o.removeEventListener('pointerup', up);
+    const up = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      o.removeEventListener('pointermove', mv); o.removeEventListener('pointerup', up); o.removeEventListener('pointercancel', up);
+      if (pinch || gen !== pinchGen) return; // a pinch took over and commits its own change
       const after = JSON.stringify(fx);
       Object.assign(fx, JSON.parse(before));
       if (after !== before) commit(corner >= 0 ? 'Scale' : rot ? 'Rotation' : 'Position', () => Object.assign(fx, JSON.parse(after)));
     };
-    o.addEventListener('pointermove', mv); o.addEventListener('pointerup', up);
+    o.addEventListener('pointermove', mv); o.addEventListener('pointerup', up); o.addEventListener('pointercancel', up);
   });
 }
 

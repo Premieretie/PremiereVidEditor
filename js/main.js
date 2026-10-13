@@ -9,13 +9,17 @@ import { initProject, initEffects, initEffectControls, initMixer, initMeters, in
 import { exportDialog } from './exporter.js';
 import { initBridge } from './bridge.js';
 import { initClaudeChat, focusClaude } from './claude-chat.js';
+import { initPhone, showPane, toggleMode } from './phone.js';
 import { buildMenubar, tabs, splitter, toast, modal, confirmBox, dialog } from './ui.js';
-import { $, $$, h, debounce, download, pickFiles, timecode } from './util.js';
+import { $, $$, h, debounce, download, pickFiles, timecode, isPhone } from './util.js';
 import * as A from './actions.js';
 
 // ---------------- Layout ----------------
-const showTop = tabs($('#p-src'));
-const showBottom = tabs($('#p-proj'));
+const showTopTab = tabs($('#p-src'));
+const showBottomTab = tabs($('#p-proj'));
+// In the phone layout every panel is a pane in the main area; on desktop it is a tab in its panel.
+const showTop = name => isPhone() ? showPane(name) : showTopTab(name);
+const showBottom = name => isPhone() ? showPane(name) : showBottomTab(name);
 initSource($('[data-page=source]'));
 initEffectControls($('[data-page=effects]'));
 initMixer($('[data-page=mixer]'));
@@ -28,11 +32,12 @@ initTools($('#tools'));
 initMeters($('#meters'));
 initBridge();
 initClaudeChat($('[data-page=claude]'));
+$('.topbar-right').prepend(h('button.layout-btn', { title: 'Switch to the phone layout', on: { click: toggleMode } }, '📱 Phone'));
 $('.topbar-right').prepend(h('button.ask-claude', { title: 'Edit with Claude (Ctrl+J)', on: { click: () => { showTop('claude'); focusClaude(); } } }, '✳ Ask Claude'));
 
 bus.on('show-tab', name => { if (['source', 'effects', 'mixer', 'claude'].includes(name)) showTop(name); else showBottom(name); });
 bus.on('focus-effect-controls', () => showTop('effects'));
-bus.on('selection', () => { if (ui.sel.size && $('#p-src .tab.active')?.dataset.tab === 'source' && !sourceState.media) showTop('effects'); });
+bus.on('selection', () => { if (!isPhone() && ui.sel.size && $('#p-src .tab.active')?.dataset.tab === 'source' && !sourceState.media) showTop('effects'); });
 bus.on('project', () => { $('#prog-title').textContent = `Program: ${seq().name}`; $('#tl-title').textContent = seq().name; });
 
 const ws = $('.workspace');
@@ -136,7 +141,7 @@ async function renameProject() {
 // ---------------- Menus ----------------
 const sel = () => A.selClips();
 const hasSel = () => ui.sel.size > 0;
-buildMenubar($('.menubar'), [
+const MENUS = [
   {
     label: 'File', items: () => [
       { label: 'New Project', key: 'Ctrl+Alt+N', action: newProjectCmd },
@@ -251,6 +256,9 @@ buildMenubar($('.menubar'), [
       { label: 'Playback Resolution', sub: [['auto', 'Auto'], ['1', 'Full'], ['0.5', '1/2'], ['0.25', '1/4']].map(([v, l]) => ({ label: l, checked: $('#p-prog .mon-sel[title="Select Playback Resolution"]').value === v, action: () => { const s = $('#p-prog .mon-sel[title="Select Playback Resolution"]'); s.value = v; engine.dirty = true; } })) },
       '-',
       { label: 'Maximize Panel Under Cursor', key: '`', action: () => toggleMaximize(hoverPanel) },
+      '-',
+      { label: 'Phone Layout', checked: isPhone(), action: toggleMode },
+      { label: 'Desktop Layout', checked: !isPhone(), action: toggleMode },
     ],
   },
   {
@@ -274,7 +282,8 @@ buildMenubar($('.menubar'), [
       { label: 'About', action: () => modal('About Premiere Web', h('div', {}, h('p', {}, 'A browser-based non-linear video editor inspired by Adobe Premiere Pro. Everything runs locally in your browser — your media never leaves your computer.'), h('p.muted', {}, 'Not affiliated with Adobe. MP4 muxing by mp4-muxer (MIT).')), [{ label: 'OK', primary: true, action: c => c() }]) },
     ],
   },
-]);
+];
+buildMenubar($('.menubar'), MENUS);
 
 // ---------------- Keyboard ----------------
 function isTyping(e) {
@@ -393,5 +402,6 @@ function welcome() {
   ]);
 }
 
+initPhone(MENUS);
 loadInitial();
 window.__app = { project: () => project, seq, ui, bus, A, engine, importFiles, mediaById, placeMedia, commit };

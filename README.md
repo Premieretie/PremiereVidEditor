@@ -40,6 +40,18 @@ A Premiere Pro–style, non-linear video editor that runs entirely in the browse
 - A real-time recording fallback for browsers without WebCodecs
 - WAV audio mixdown and PNG still frames
 
+## Phone layout
+
+The editor has a touch-friendly phone layout. It switches on automatically on phones, and you can toggle it anywhere with **📱 Phone** (top bar) or **View ▸ Phone Layout**. On the phone, the 🖥 button switches back to desktop.
+
+- **Screen layout:** the preview sits on top, an edit bar of context actions is in the middle, and one panel shows at a time, switched with the bottom tabs (Timeline, Media, Effects, Adjust, Audio, Claude). Holding the phone sideways puts the preview on the left.
+- **Edit bar:** with a clip selected it offers Split, Delete, Ripple delete, Adjust, Speed, Fade, Effects, Copy, Enable and More. With nothing selected it offers Media, Text, Split, Razor, Transitions, Fit and Import.
+- **Gestures:**
+  - **Timeline:** tap a clip to select it, drag it to move it, and drag its edges to trim. Drag empty space to scroll, pinch to zoom, and long-press a clip for its full menu.
+  - **Preview:** drag the selected clip to move it, or pinch to resize it.
+- **Adding media:** tap **+** on a Media item to insert it at the playhead. Tap an effect or transition to apply it to the selected clip.
+- **Menus:** the ☰ button opens the full desktop menus as a bottom sheet.
+
 ## Editing with Claude
 
 ### In the browser: the Claude panel

@@ -102,3 +102,6 @@ export const LABEL_COLORS = {
   Purple: '#9f5ccf', Blue: '#4b6ee0', Teal: '#2a9d9a', Magenta: '#d64ad6',
   Tan: '#c9a97c', Green: '#3ea85a', Brown: '#a06a3c', Yellow: '#e2cf3c',
 };
+
+/** True when the phone layout is active. */
+export const isPhone = () => document.body.classList.contains('phone');

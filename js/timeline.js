@@ -13,6 +13,10 @@ import { contextMenu, toast, prompt } from './ui.js';
 const RULER_H = 30;
 const SEP_H = 8;
 const EDGE_PX = 7;
+let touchInput = false;    // last pointer was a finger: larger hit areas, drag-to-pan
+const edgeTol = () => touchInput ? 16 : EDGE_PX;
+const touches = new Map(); // active finger pointers on the timeline body
+let pinch = null;          // {d0, z0, t0} while two fingers zoom
 
 let root, rulerCv, bodyCv, headersEl, headersInner, hbar, hthumb, tcEl, tabsEl;
 let rg, bg; // contexts
@@ -581,8 +585,8 @@ function hitTest(x, y) {
   for (const c of cl) {
     const xs = tToX(c.start), xe = tToX(clipEnd(c));
     const ds = Math.abs(x - xs) + (x < xs ? 0.5 : 0), de = Math.abs(x - xe) + (x > xe ? 0.5 : 0);
-    if (ds <= EDGE_PX && ds < bd) { bd = ds; edge = { clip: c, side: 'in' }; }
-    if (de <= EDGE_PX && de < bd) { bd = de; edge = { clip: c, side: 'out' }; }
+    if (ds <= edgeTol() && ds < bd) { bd = ds; edge = { clip: c, side: 'in' }; }
+    if (de <= edgeTol() && de < bd) { bd = de; edge = { clip: c, side: 'out' }; }
   }
   const clip = cl.find(c => t >= c.start && t < clipEnd(c));
   let trans = null;
@@ -611,12 +615,55 @@ function setupBody() {
   bodyCv.addEventListener('wheel', onWheel, { passive: false });
   bodyCv.addEventListener('pointermove', e => { if (!drag) updateHover(e); });
   bodyCv.addEventListener('pointerleave', () => { hover = null; dirty = true; });
+  setupTouch();
   bodyCv.addEventListener('pointerdown', onDown);
   bodyCv.addEventListener('dblclick', e => {
     const hit = hitTest(e.offsetX, e.offsetY);
     if (hit.clip) bus.emit('open-source', hit.clip.mediaId, hit.clip);
   });
   bodyCv.addEventListener('contextmenu', onContext);
+}
+
+// Two-finger pinch zooms the timeline; a finger on empty space pans; long-press opens the clip menu.
+function setupTouch() {
+  const dist = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  const mid = () => { const [a, b] = [...touches.values()]; const r = bodyCv.getBoundingClientRect(); return (a.x + b.x) / 2 - r.left; };
+  bodyCv.addEventListener('pointerdown', e => {
+    touchInput = e.pointerType === 'touch';
+    if (!touchInput) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {
+      e.stopImmediatePropagation(); // the second finger never starts its own drag
+      if (drag && drag.mode !== 'hand') return; // a clip drag is already running: finish it first
+      pinch = { d0: Math.max(10, dist()), z0: s().zoom, t0: xToT(mid()) };
+    }
+  }, true);
+  bodyCv.addEventListener('pointermove', e => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2) {
+      const q = s();
+      q.zoom = clamp(pinch.z0 * dist() / pinch.d0, minZoom(), q.fps * 80);
+      q.scrollX = pinch.t0 * q.zoom - mid();
+      dirty = true;
+    }
+  });
+  const end = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
+  bodyCv.addEventListener('pointerup', end);
+  bodyCv.addEventListener('pointercancel', end);
+}
+
+function startLongPress(e) {
+  const x0 = e.clientX, y0 = e.clientY, ox = e.offsetX, oy = e.offsetY;
+  let timer = setTimeout(() => {
+    timer = null; cleanup();
+    if (pinch) return;
+    navigator.vibrate?.(15);
+    onContext({ preventDefault() { }, clientX: x0, clientY: y0, offsetX: ox, offsetY: oy, altKey: false });
+  }, 550);
+  const mv = ev => { if (ev.pointerId === e.pointerId && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) cleanup(); };
+  const cleanup = () => { if (timer) clearTimeout(timer); timer = null; bodyCv.removeEventListener('pointermove', mv); bodyCv.removeEventListener('pointerup', cleanup); bodyCv.removeEventListener('pointercancel', cleanup); };
+  bodyCv.addEventListener('pointermove', mv); bodyCv.addEventListener('pointerup', cleanup); bodyCv.addEventListener('pointercancel', cleanup);
 }
 
 function onWheel(e) {
@@ -656,9 +703,11 @@ function onDown(e) {
   if (e.button !== 0) return;
   bodyCv.focus({ preventScroll: true });
   ui.focus = 'timeline';
+  touchInput = e.pointerType === 'touch';
   const hit = hitTest(e.offsetX, e.offsetY);
   const tool = ui.tool;
   const q = s();
+  if (touchInput && hit.clip) startLongPress(e);
   if (tool === 'hand') return startHand(e);
   if (tool === 'zoom') { zoomBy(e.altKey ? 1 / 1.6 : 1.6, e.offsetX); return; }
   if (tool === 'razor') {
@@ -703,7 +752,8 @@ function onDown(e) {
     beginMove(e, c, hit, e.altKey);
     return;
   }
-  // empty: marquee
+  // empty: marquee (with a finger: deselect and pan instead)
+  if (touchInput) { A.clearSelection(); return startHand(e); }
   if (!e.shiftKey) A.clearSelection();
   drag = { mode: 'marquee', x0: e.offsetX, y0: e.offsetY, x1: e.offsetX, y1: e.offsetY, moved: false, base: new Set(ui.sel) };
   capture(e, ev => {
@@ -723,8 +773,9 @@ function onDown(e) {
 
 function capture(e, move, up) {
   bodyCv.setPointerCapture(e.pointerId);
-  const mv = ev => { move(ev); dirty = true; };
+  const mv = ev => { if (ev.pointerId !== e.pointerId) return; move(ev); dirty = true; };
   const u = ev => {
+    if (ev.pointerId !== e.pointerId) return;
     bodyCv.removeEventListener('pointermove', mv); bodyCv.removeEventListener('pointerup', u); bodyCv.removeEventListener('pointercancel', u);
     snapLine = null; up(ev); dirty = true;
   };
@@ -734,7 +785,8 @@ function capture(e, move, up) {
 function startHand(e) {
   const q = s(); const x0 = e.clientX, y0 = e.clientY, sx = q.scrollX, sy = q.scrollY;
   setCursor('grabbing');
-  capture(e, ev => { q.scrollX = sx - (ev.clientX - x0); q.scrollY = sy - (ev.clientY - y0); }, () => setCursor(ui.tool === 'hand' ? 'grab' : 'default'));
+  drag = { mode: 'hand' };
+  capture(e, ev => { if (pinch) return; q.scrollX = sx - (ev.clientX - x0); q.scrollY = sy - (ev.clientY - y0); }, () => { drag = null; setCursor(ui.tool === 'hand' ? 'grab' : 'default'); });
 }
 
 // ----- Move -----
