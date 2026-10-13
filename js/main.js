@@ -7,6 +7,7 @@ import { initTimeline, zoomBy, zoomFit, invalidate } from './timeline.js';
 import { initProgram, initSource, exportFrame, srcToggle, srcMarkIn, srcMarkOut, srcEdit, createTitleAt, sourceState } from './monitors.js';
 import { initProject, initEffects, initEffectControls, initMixer, initMeters, initHistory, initTools, doImport, TOOLS } from './panels.js';
 import { exportDialog } from './exporter.js';
+import { initBridge } from './bridge.js';
 import { buildMenubar, tabs, splitter, toast, modal, confirmBox, dialog } from './ui.js';
 import { $, $$, h, debounce, download, pickFiles, timecode } from './util.js';
 import * as A from './actions.js';
@@ -24,6 +25,7 @@ initHistory($('[data-page=history]'));
 initTimeline($('#p-tl .panel-body'));
 initTools($('#tools'));
 initMeters($('#meters'));
+initBridge();
 
 bus.on('show-tab', name => { if (['source', 'effects', 'mixer'].includes(name)) showTop(name); else showBottom(name); });
 bus.on('focus-effect-controls', () => showTop('effects'));

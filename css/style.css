@@ -309,3 +309,18 @@ input[type=checkbox] { accent-color: var(--accent); }
 @media (max-width: 900px) {
   .ws-tabs { display: none; }
 }
+
+/* ---------- Claude bridge ---------- */
+.claude-btn { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; border-radius: 11px; border: 1px solid #4a4a4a; background: #262626; color: #cfcfcf; font-size: 11px; }
+.claude-btn:hover { background: #333; color: #fff; }
+.cl-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+.claude-btn[data-state=connecting] .cl-dot { background: #e2b53c; animation: clpulse 1.2s infinite; }
+.claude-btn[data-state=connected] { border-color: #b8613f; color: #f1c6b3; }
+.claude-btn[data-state=connected] .cl-dot { background: #d97757; }
+.claude-btn.busy .cl-dot { box-shadow: 0 0 0 3px rgba(217,119,87,.45); }
+@keyframes clpulse { 50% { opacity: .35; } }
+.cl-panel { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+.cl-panel code { background: #1a1a1a; padding: 1px 4px; border-radius: 3px; font-size: 11px; word-break: break-all; }
+.cl-panel ol { padding-left: 18px; line-height: 1.6; }
+.cl-panel a { color: var(--accent-2); }
+.cl-state { padding: 8px 10px; background: #1f1f1f; border-radius: 4px; }

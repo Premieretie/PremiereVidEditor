@@ -38,9 +38,7 @@ export async function exportDialog() {
   let a = 0, b = D;
   if (r.range === 'io') { a = s.inPoint ?? 0; b = s.outPoint ?? D; }
   if (b - a <= 0) return toast('Export range is empty');
-  let ow = s.width, oh = s.height;
-  if (r.size !== 'match') { const H = parseInt(r.size, 10); oh = H; ow = Math.round(s.width * H / s.height); }
-  ow = Math.max(2, Math.round(ow / 2) * 2); oh = Math.max(2, Math.round(oh / 2) * 2);
+  const [ow, oh] = outputSize(s, r.size);
   const opts = { name: r.name || s.name, a, b, ow, oh, bitrate: r.bitrate * 1e6, audio: r.audio };
   try {
     if (r.format === 'mp4' || r.format === 'webm') await exportEncoded(r.format, opts);
@@ -53,6 +51,45 @@ export async function exportDialog() {
   } finally {
     engine.suspended = false; engine.dirty = true;
   }
+}
+
+function outputSize(s, size) {
+  let ow = s.width, oh = s.height;
+  if (size && size !== 'match') { const H = parseInt(size, 10); oh = H; ow = Math.round(s.width * H / s.height); }
+  return [Math.max(2, Math.round(ow / 2) * 2), Math.max(2, Math.round(oh / 2) * 2)];
+}
+
+/** Supported formats in this browser (for the MCP bridge). */
+export async function supportedFormats() {
+  const f = [];
+  if (hasWebCodecs()) {
+    if (await pickVideoCodec('mp4', 1280, 720, 30, 8e6)) f.push('mp4');
+    if (await pickVideoCodec('webm', 1280, 720, 30, 8e6)) f.push('webm');
+  }
+  return [...f, 'realtime', 'wav'];
+}
+
+/** Programmatic export: resolves to {blob, filename} instead of downloading. */
+export async function runExport({ format = 'mp4', name, range = 'all', size = 'match', bitrate, audio: withAudio = true } = {}) {
+  pause();
+  const s = seq();
+  const D = seqDuration(s);
+  if (D <= 0) throw new Error('The sequence is empty');
+  let a = 0, b = D;
+  if (range === 'io') { a = s.inPoint ?? 0; b = s.outPoint ?? D; }
+  else if (Array.isArray(range)) { a = Math.max(0, +range[0]); b = Math.min(D, +range[1]); }
+  if (b - a <= 0) throw new Error('Export range is empty');
+  const [ow, oh] = outputSize(s, size);
+  let out = null;
+  const opts = { name: name || s.name, a, b, ow, oh, bitrate: (bitrate || (oh >= 2000 ? 40 : oh >= 1000 ? 16 : 8)) * 1e6, audio: withAudio, deliver: (blob, filename) => out = { blob, filename } };
+  try {
+    if (format === 'mp4' || format === 'webm') await exportEncoded(format, opts);
+    else if (format === 'realtime') await exportRealtime(opts);
+    else if (format === 'wav') await exportWAV(opts);
+    else throw new Error('Unknown format ' + format);
+  } finally { engine.suspended = false; engine.dirty = true; }
+  if (!out) throw new Error('Export was cancelled');
+  return out;
 }
 
 // ---------------- Audio mixdown ----------------
@@ -165,7 +202,7 @@ async function prepareFrame(s, t) {
   await Promise.all(waits);
 }
 
-async function exportEncoded(container, { name, a, b, ow, oh, bitrate, audio: withAudio }) {
+async function exportEncoded(container, { name, a, b, ow, oh, bitrate, audio: withAudio, deliver = download }) {
   const s = seq();
   const fps = s.fps;
   let cancelled = false;
@@ -236,7 +273,7 @@ async function exportEncoded(container, { name, a, b, ow, oh, bitrate, audio: wi
   await venc.flush(); venc.close();
   muxer.finalize();
   pb.close();
-  download(new Blob([target.buffer], { type: `video/${container}` }), `${name}.${container}`);
+  deliver(new Blob([target.buffer], { type: `video/${container}` }), `${name}.${container}`);
   toast(`Exported ${name}.${container} (${(target.buffer.byteLength / 1048576).toFixed(1)} MB)`, 5000);
 }
 
@@ -249,7 +286,7 @@ function prepareFit(src, w, h) {
 }
 
 // ---------------- Real-time (MediaRecorder) ----------------
-async function exportRealtime({ name, a, b, ow, oh, bitrate, audio: withAudio }) {
+async function exportRealtime({ name, a, b, ow, oh, bitrate, audio: withAudio, deliver = download }) {
   const s = seq();
   ensureAudio();
   const canvas = document.createElement('canvas');
@@ -277,19 +314,19 @@ async function exportRealtime({ name, a, b, ow, oh, bitrate, audio: withAudio })
   pb.close();
   if (cancelled) return toast('Export cancelled');
   const ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
-  download(new Blob(chunks, { type: mimeType.split(';')[0] }), `${name}.${ext}`);
+  deliver(new Blob(chunks, { type: mimeType.split(';')[0] }), `${name}.${ext}`);
   toast(`Exported ${name}.${ext}`);
 }
 
 // ---------------- WAV ----------------
-async function exportWAV({ name, a, b }) {
+async function exportWAV({ name, a, b, deliver = download }) {
   const s = seq();
   const pb = progressBox(`Exporting ${name}.wav`);
   const buf = await mixdown(s, a, b, 48000, t => pb.set(0.3, t));
   pb.set(0.9, 'Encoding WAV…');
   const blob = encodeWAV(buf);
   pb.close();
-  download(blob, name + '.wav');
+  deliver(blob, name + '.wav');
 }
 
 export function encodeWAV(buf) {
@@ -305,4 +342,4 @@ export function encodeWAV(buf) {
   return new Blob([out.buffer], { type: 'audio/wav' });
 }
 
-export { hasWebCodecs };
+export { hasWebCodecs, prepareFrame as prepareFrameForRender };

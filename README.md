@@ -40,6 +40,16 @@ A Premiere Pro–style, non-linear video editor that runs entirely in the browse
 - A real-time recording fallback for browsers without WebCodecs
 - WAV audio mixdown and PNG still frames
 
+## Editing with Claude (MCP)
+
+Claude can edit your project directly. It can import media, cut and arrange clips, add effects, titles, transitions and keyframes, check its work by looking at rendered frames, and export the result.
+
+1. Set up the small local MCP server in [`mcp-server/`](mcp-server/README.md) and add it to Claude Desktop or Claude Code.
+2. In the editor, click **Connect Claude** (top right).
+3. Ask Claude something like: *"Import ~/Videos/clip.mp4, trim the first 3 seconds, add a title that says 'Summer 2026' and export it as MP4."*
+
+Every change Claude makes appears live and can be undone from the History panel or with `Ctrl+Z`.
+
 ## Deploying to GitHub Pages
 
 1. Push this repository to GitHub (the files are already at the repository root).
